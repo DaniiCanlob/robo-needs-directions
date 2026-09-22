@@ -1,0 +1,13 @@
+{
+  "name": "robo-directions",
+  "version": "1.0.0",
+  "description": "3D English game: guide Robo across town by answering directions questions. Static game + scores API.",
+  "private": true,
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "license": "MIT"
+}

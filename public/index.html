@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Guide Robo across town by answering directions questions in English. English A1-A2.">
+<title>Robo Needs Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap">
+
+<style>
+  :root{
+    --ink:#0C1F19;
+    --forest:#1B4332;
+    --forest-2:#143326;
+    --sage:#74C69D;
+    --sage-dim:#4E8F73;
+    --signal:#E8722C;
+    --signal-soft:#F0A57A;
+    --paper:#F2F5F1;
+    --asphalt:#5E6A72;
+    --line:rgba(255,255,255,.16);
+    --sign-green:#0E5C3A;
+    --shadow:0 18px 40px -18px rgba(6,20,15,.75);
+    --display:"Overpass","Arial Narrow",Arial,sans-serif;
+    --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--body);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #stage{position:fixed;inset:0}
+  #stage canvas{display:block;width:100%;height:100%}
+
+  #root{position:fixed;inset:0;pointer-events:none;font-family:var(--body)}
+  #root button, #root input{pointer-events:auto;font-family:inherit}
+
+  /* ---------------------------------------------------------- start screen */
+  .veil{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    background:radial-gradient(120% 90% at 50% 20%, rgba(12,31,25,.72), rgba(12,31,25,.94));
+    backdrop-filter:blur(3px);
+    pointer-events:auto;
+  }
+
+  .panel{
+    width:min(480px,100%);
+    background:linear-gradient(180deg,#153A2C,#0F2B21);
+    border:1px solid rgba(116,214,157,.28);
+    border-radius:18px;
+    padding:34px 34px 30px;
+    box-shadow:var(--shadow);
+    text-align:left;
+  }
+
+  .eyebrow{
+    font-family:var(--display);
+    font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--sage);margin:0 0 12px;
+  }
+
+  .panel h1{
+    font-family:var(--display);
+    font-weight:800;font-size:clamp(30px,5.2vw,40px);line-height:1.02;
+    margin:0 0 6px;color:#fff;text-wrap:balance;letter-spacing:-.01em;
+  }
+  .panel .es{margin:0 0 20px;color:var(--sage);font-style:italic;font-size:15px}
+
+  .brief{
+    margin:0 0 22px;color:#C9DED4;font-size:14.5px;line-height:1.6;max-width:44ch;
+  }
+  .brief b{color:#fff;font-weight:600}
+
+  label.fieldlabel{
+    display:block;font-family:var(--display);font-size:12px;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin:0 0 8px;
+  }
+
+  input[type=text]{
+    width:100%;padding:13px 15px;font-size:16px;color:#fff;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(116,214,157,.34);
+    border-radius:10px;outline:none;
+  }
+  input[type=text]::placeholder{color:#6E8C7E}
+  input[type=text]:focus-visible{border-color:var(--signal);box-shadow:0 0 0 3px rgba(232,114,44,.28)}
+
+  .primary{
+    margin-top:18px;width:100%;
+    padding:14px 18px;border:0;border-radius:10px;cursor:pointer;
+    background:var(--signal);color:#22150C;
+    font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:.02em;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .primary:hover{filter:brightness(1.07)}
+  .primary:active{transform:translateY(1px)}
+  .primary:disabled{opacity:.45;cursor:not-allowed}
+  .primary:focus-visible{outline:3px solid #fff;outline-offset:2px}
+
+  /* ------------------------------------------------------------ road sign */
+  .signwrap{
+    position:absolute;top:18px;left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    width:min(560px,calc(100% - 32px));
+  }
+
+  .sign{
+    width:100%;
+    background:var(--sign-green);
+    border:3px solid #fff;
+    border-radius:9px;
+    padding:11px 18px;
+    display:flex;align-items:center;gap:14px;
+    box-shadow:0 12px 26px -14px rgba(0,0,0,.8);
+    animation:signIn .45s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes signIn{from{transform:translateY(-10px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+
+  .sign .arrow{
+    font-family:var(--display);font-size:26px;line-height:1;color:#fff;flex:none;
+  }
+  .sign .txt{min-width:0}
+  .sign .lead{
+    font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.16em;
+    text-transform:uppercase;color:#9FD9BC;
+  }
+  .sign .dest{
+    font-family:var(--display);font-size:clamp(19px,3.4vw,25px);font-weight:800;
+    color:#fff;line-height:1.12;letter-spacing:.01em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .sign .destes{font-size:12.5px;font-style:italic;color:#9FD9BC;margin-top:1px}
+
+  .counters{
+    display:flex;gap:8px;font-family:var(--mono);font-size:12px;
+  }
+  .chip{
+    background:rgba(10,26,20,.82);border:1px solid var(--line);
+    border-radius:999px;padding:5px 12px;color:#BFD6CA;
+    font-variant-numeric:tabular-nums;
+  }
+  .chip b{color:#fff;font-weight:500}
+  .chip.warn b{color:var(--signal-soft)}
+
+  /* --------------------------------------------------------------- toast */
+  .toast{
+    position:absolute;top:156px;left:50%;transform:translateX(-50%);
+    width:min(430px,calc(100% - 32px));
+    background:rgba(10,26,20,.92);
+    border:1px solid var(--line);border-left:3px solid var(--sage);
+    border-radius:10px;padding:11px 15px;
+    box-shadow:var(--shadow);
+    animation:toastIn .22s ease-out;
+  }
+  .toast.bad{border-left-color:var(--signal)}
+  .toast .t1{font-size:14.5px;color:#fff;line-height:1.35}
+  .toast .t2{font-size:12.5px;color:#9FBBAC;font-style:italic;margin-top:3px}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%)}}
+
+  /* ------------------------------------------------------------- controls */
+  .pad{
+    position:absolute;left:50%;bottom:20px;transform:translateX(-50%);
+    width:min(600px,calc(100% - 24px));
+    display:flex;flex-direction:column;gap:9px;
+  }
+  .padrow{display:flex;gap:9px}
+
+  .cmd{
+    flex:1;min-width:0;
+    background:rgba(11,30,23,.9);
+    border:1px solid rgba(116,214,157,.3);
+    border-radius:12px;
+    padding:11px 8px 9px;
+    color:#fff;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    transition:background .13s ease, border-color .13s ease, transform .1s ease;
+  }
+  .cmd .glyph{font-family:var(--display);font-size:19px;line-height:1;color:var(--sage)}
+  .cmd .en{font-family:var(--display);font-weight:700;font-size:13.5px;line-height:1.15;text-align:center}
+  .cmd .sp{font-size:11px;color:#8FAE9F;font-style:italic;line-height:1.15;text-align:center}
+  .cmd:hover:not(:disabled){background:rgba(20,52,39,.95);border-color:var(--sage)}
+  .cmd:active:not(:disabled){transform:translateY(1px)}
+  .cmd:disabled{opacity:.4;cursor:not-allowed}
+  .cmd:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+  .cmd.stop{border-color:rgba(232,114,44,.5)}
+  .cmd.stop .glyph{color:var(--signal)}
+  .cmd.stop:hover:not(:disabled){background:rgba(64,30,12,.9);border-color:var(--signal)}
+
+  .utility{
+    position:absolute;right:16px;bottom:20px;display:flex;flex-direction:column;gap:8px;
+  }
+  .ubtn{
+    background:rgba(10,26,20,.86);border:1px solid var(--line);color:#CFE3D8;
+    border-radius:10px;padding:9px 13px;cursor:pointer;font-size:12.5px;
+    display:flex;align-items:center;gap:7px;
+  }
+  .ubtn:hover{border-color:var(--sage);color:#fff}
+  .ubtn:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+  .ubtn.on{border-color:var(--sage);color:#fff;background:rgba(27,67,50,.9)}
+
+  /* --------------------------------------------------------------- result */
+  .stars{font-family:var(--display);font-size:34px;letter-spacing:.12em;color:var(--signal);margin:2px 0 14px}
+  .statrow{
+    display:flex;gap:10px;margin:0 0 20px;
+  }
+  .stat{
+    flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);
+    border-radius:10px;padding:11px 12px;
+  }
+  .stat .n{font-family:var(--mono);font-size:23px;color:#fff;font-variant-numeric:tabular-nums}
+  .stat .k{font-size:11px;color:var(--sage);text-transform:uppercase;letter-spacing:.1em;margin-top:2px;font-family:var(--display);font-weight:700}
+
+  .recap{margin:0 0 20px;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  .recap li{
+    display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+    font-size:13.5px;color:#C9DED4;border-bottom:1px dashed rgba(255,255,255,.12);padding-bottom:6px;
+  }
+  .recap li b{color:#fff;font-weight:600;font-family:var(--display)}
+  .recap li span{font-family:var(--mono);font-size:12px;color:var(--sage)}
+
+  .loading{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--ink);color:var(--sage);font-family:var(--display);
+    font-size:13px;letter-spacing:.18em;text-transform:uppercase;
+  }
+
+  @media (max-width:560px){
+    .cmd .sp{display:none}
+    .pad{bottom:14px}
+    .utility{bottom:auto;top:16px;right:12px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  }
+  /* ------------------------------------------------------- question card */
+  .qcard{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    width:min(640px,calc(100% - 24px));
+    background:rgba(9,26,20,.94);
+    border:1px solid rgba(116,214,157,.34);
+    border-radius:16px;padding:15px 16px 16px;
+    box-shadow:var(--shadow);
+    pointer-events:auto;
+  }
+  .qcard.thinking{opacity:.72}
+
+  .qhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+  .bubble{
+    font-family:var(--display);font-size:10.5px;font-weight:800;letter-spacing:.16em;
+    color:#12271F;background:var(--sage);border-radius:999px;padding:3px 10px;
+  }
+  .qnum{font-family:var(--mono);font-size:11.5px;color:#8FAE9F;font-variant-numeric:tabular-nums}
+
+  .qtext{
+    margin:0;font-family:var(--display);font-weight:700;
+    font-size:clamp(16px,2.6vw,19px);line-height:1.28;color:#fff;text-wrap:balance;
+  }
+  .qtext.walking{color:var(--sage);font-style:italic}
+  .qes{margin:3px 0 12px;font-size:12.5px;font-style:italic;color:#8FAE9F;line-height:1.3}
+
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .opt{
+    display:flex;align-items:center;gap:10px;text-align:left;
+    background:rgba(20,52,39,.72);
+    border:1px solid rgba(116,214,157,.28);
+    border-radius:11px;padding:10px 12px;color:#fff;cursor:pointer;
+    transition:background .13s ease,border-color .13s ease,transform .1s ease;
+  }
+  .opt .og{
+    font-family:var(--display);font-size:17px;line-height:1;color:var(--sage);
+    flex:none;width:22px;text-align:center;
+  }
+  .opt .oen{font-family:var(--display);font-weight:700;font-size:13.5px;line-height:1.15}
+  .opt .oes{font-size:10.5px;color:#8FAE9F;font-style:italic;line-height:1.15;display:block}
+  .opt > span:not(.og){display:block}
+  .opt:hover{background:rgba(29,74,55,.95);border-color:var(--sage);}
+  .opt:active{transform:translateY(1px)}
+  .opt:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+
+  /* --------------------------------------------------------- stats strip */
+  .statstrip{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    font-family:var(--mono);font-size:12px;color:#9FBBAC;margin:0 0 20px;
+    font-variant-numeric:tabular-nums;
+  }
+  .statstrip b{color:#fff;font-weight:500}
+  .statstrip .dot{color:#4E8F73}
+  .statstrip .modetag{
+    color:var(--sage);border:1px solid rgba(116,214,157,.3);
+    border-radius:999px;padding:2px 9px;font-size:11px;
+  }
+
+  .ghost{
+    margin-top:9px;width:100%;padding:11px 16px;cursor:pointer;
+    background:transparent;border:1px solid rgba(116,214,157,.3);border-radius:10px;
+    color:#CFE3D8;font-size:13.5px;
+  }
+  .ghost:hover{border-color:var(--sage);color:#fff}
+  .ghost:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+
+  /* ---------------------------------------------------------- scoreboard */
+  .panel.wide{width:min(660px,100%)}
+  .boardwrap{max-height:44vh;overflow:auto;margin:0 0 18px;border-radius:10px}
+  table.board{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.board th{
+    position:sticky;top:0;background:#0F2B21;
+    font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--sage);text-align:left;
+    padding:8px 10px;border-bottom:1px solid rgba(116,214,157,.24);
+  }
+  table.board td{
+    padding:9px 10px;color:#DCEAE2;border-bottom:1px solid rgba(255,255,255,.07);
+  }
+  table.board td.num,table.board th.num{
+    text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  }
+  table.board td.rank{color:var(--sage);font-family:var(--mono);width:32px}
+  table.board td.acc{color:#fff}
+  table.board tr:last-child td{border-bottom:0}
+
+  @media (max-width:560px){
+    .opts{grid-template-columns:1fr}
+    .opt .oes{display:none}
+    .qcard{bottom:12px;padding:12px 13px 13px}
+    .utility{bottom:auto;top:16px;right:12px}
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="root"><div class="loading">Loading the town…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ===================================================== town definition */
+  const W = 18, H = 13, CELL = 4;
+  const ROAD_COLS = [1, 6, 11, 16];
+  const ROAD_ROWS = [1, 6, 11];
+
+  const inBounds = (x, z) => x >= 0 && x < W && z >= 0 && z < H;
+  const isRoad = (x, z) => inBounds(x, z) && (ROAD_COLS.indexOf(x) >= 0 || ROAD_ROWS.indexOf(z) >= 0);
+
+  const wx = (x) => (x - (W - 1) / 2) * CELL;
+  const wz = (z) => (z - (H - 1) / 2) * CELL;
+
+  // heading: 0 N(-z) 1 E(+x) 2 S(+z) 3 W(-x)
+  const DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const YAW = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+
+  const PLACES = [
+    { id:"park",     en:"the park",        es:"el parque",             x0:2,  x1:5,  z0:2, z1:5,  ex:3,  ez:6,  color:0x74B98A, h:0,   park:true },
+    { id:"hospital", en:"the hospital",    es:"el hospital",           x0:7,  x1:10, z0:2, z1:3,  ex:8,  ez:1,  color:0x9AD7D6, h:5.4 },
+    { id:"school",   en:"the school",      es:"la escuela",            x0:7,  x1:10, z0:4, z1:5,  ex:8,  ez:6,  color:0xB6A8E0, h:4.6 },
+    { id:"museum",   en:"the museum",      es:"el museo",              x0:12, x1:15, z0:2, z1:3,  ex:13, ez:1,  color:0xC9B3E6, h:5.0 },
+    { id:"library",  en:"the library",     es:"la biblioteca",         x0:12, x1:15, z0:4, z1:5,  ex:13, ez:6,  color:0xA8BEE6, h:4.2 },
+    { id:"market",   en:"the supermarket", es:"el supermercado",       x0:2,  x1:5,  z0:7, z1:8,  ex:1,  ez:7,  color:0xF0CE8A, h:4.0 },
+    { id:"bank",     en:"the bank",        es:"el banco",              x0:2,  x1:5,  z0:9, z1:10, ex:3,  ez:11, color:0xB7C9E2, h:5.6 },
+    { id:"post",     en:"the post office", es:"la oficina de correos", x0:7,  x1:10, z0:7, z1:8,  ex:6,  ez:7,  color:0xA9C6D8, h:4.4 },
+    { id:"pharmacy", en:"the pharmacy",    es:"la farmacia",           x0:7,  x1:10, z0:9, z1:10, ex:8,  ez:11, color:0x8FD3C7, h:4.0 },
+    { id:"hotel",    en:"the hotel",       es:"el hotel",              x0:12, x1:15, z0:7, z1:8,  ex:11, ez:7,  color:0xF2AE9B, h:6.2 },
+    { id:"cafe",     en:"the cafe",        es:"la cafetería",          x0:12, x1:15, z0:9, z1:10, ex:13, ez:11, color:0xEFA184, h:3.8 }
+  ];
+
+  const CROSSWALKS = [
+    [4, 1], [14, 1], [6, 3], [11, 3], [4, 6], [14, 6], [6, 9], [11, 9], [4, 11], [14, 11]
+  ];
+  const crossKey = (x, z) => x + "," + z;
+  const CROSS_SET = new Set(CROSSWALKS.map((c) => crossKey(c[0], c[1])));
+
+  const ROUNDABOUT = [11, 6];
+
+  const STREETS_H = [
+    { z: 1,  name: "PARK AVENUE" },
+    { z: 6,  name: "MAIN STREET" },
+    { z: 11, name: "OAK ROAD" }
+  ];
+  const STREETS_V = [
+    { x: 1,  name: "FIRST ST" },
+    { x: 6,  name: "SECOND ST" },
+    { x: 11, name: "THIRD ST" },
+    { x: 16, name: "FOURTH ST" }
+  ];
+
+  const START = { x: 1, z: 1, h: 2 }; // corner of Park Ave & First St, facing south
+
+  /* ============================================================ pathfinding */
+  function bfsNext(from, to) {
+    const key = (c) => c[0] + "," + c[1];
+    const prev = new Map();
+    const seen = new Set([key(from)]);
+    const q = [from];
+    while (q.length) {
+      const cur = q.shift();
+      if (cur[0] === to[0] && cur[1] === to[1]) {
+        // walk back to the first step after `from`
+        let node = cur;
+        while (true) {
+          const p = prev.get(key(node));
+          if (!p) return null;
+          if (p[0] === from[0] && p[1] === from[1]) return node;
+          node = p;
+        }
+      }
+      for (let d = 0; d < 4; d++) {
+        const n = [cur[0] + DIR[d][0], cur[1] + DIR[d][1]];
+        if (!isRoad(n[0], n[1]) || seen.has(key(n))) continue;
+        seen.add(key(n));
+        prev.set(key(n), cur);
+        q.push(n);
+      }
+    }
+    return null;
+  }
+
+  /* ================================================================ canvas text */
+  function textTexture(text, opts) {
+    opts = opts || {};
+    const pad = opts.pad === undefined ? 26 : opts.pad;
+    const size = opts.size || 56;
+    const font = opts.font || ('700 ' + size + 'px Overpass, "Arial Narrow", Arial, sans-serif');
+    const track = opts.tracking || "0px";
+    const c = document.createElement("canvas");
+    const g = c.getContext("2d");
+    g.font = font;
+    try { g.letterSpacing = track; } catch (err) { /* older browsers */ }
+    const w = Math.ceil(g.measureText(text).width) + pad * 2 + 8;
+    const h = Math.ceil(size * 1.5) + pad;
+    c.width = w; c.height = h;
+    const g2 = c.getContext("2d");
+    g2.font = font;
+    try { g2.letterSpacing = track; } catch (err) { /* older browsers */ }
+    g2.textAlign = "center";
+    g2.textBaseline = "middle";
+    if (opts.bg) {
+      g2.fillStyle = opts.bg;
+      const r = opts.radius === undefined ? 18 : opts.radius;
+      g2.beginPath();
+      g2.moveTo(r, 0); g2.arcTo(w, 0, w, h, r); g2.arcTo(w, h, 0, h, r);
+      g2.arcTo(0, h, 0, 0, r); g2.arcTo(0, 0, w, 0, r); g2.closePath(); g2.fill();
+      if (opts.border) { g2.strokeStyle = opts.border; g2.lineWidth = 5; g2.stroke(); }
+    }
+    g2.fillStyle = opts.color || "#ffffff";
+    g2.fillText(text, w / 2, h / 2 + 1);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    return { texture: tex, w: w, h: h };
+  }
+
+  /* ==================================================================== scene */
+  const Scene = {};
+
+  Scene.init = function (host) {
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(host.clientWidth, host.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    host.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9FD3E4);
+    scene.fog = new THREE.Fog(0x9FD3E4, 85, 210);
+
+    const camera = new THREE.PerspectiveCamera(52, host.clientWidth / host.clientHeight, 0.5, 400);
+    camera.position.set(0, 40, 46);
+
+    scene.add(new THREE.HemisphereLight(0xC8DCE8, 0x6B8A5F, 0.55));
+    const sun = new THREE.DirectionalLight(0xFFF3DE, 1.05);
+    sun.position.set(34, 52, 22);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -52; sc.right = 52; sc.top = 42; sc.bottom = -42; sc.near = 1; sc.far = 160;
+    sun.shadow.bias = -0.0012;
+    scene.add(sun);
+
+    /* ---- ground */
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(W * CELL + 260, H * CELL + 260),
+      new THREE.MeshLambertMaterial({ color: 0x7CB183 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const roadMat = new THREE.MeshLambertMaterial({ color: 0x5E6A72 });
+    const curbMat = new THREE.MeshLambertMaterial({ color: 0xC8CFCB });
+    const paintMat = new THREE.MeshBasicMaterial({ color: 0xF3F6F2 });
+
+    const flat = (w, d, mat, x, z, y) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), mat);
+      m.position.set(x, y === undefined ? 0.08 : y, z);
+      m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    };
+
+    // curbs sit slightly wider and lower than the asphalt
+    ROAD_COLS.forEach((x) => flat(CELL + 1.1, H * CELL + 8, curbMat, wx(x), 0, 0.05));
+    ROAD_ROWS.forEach((z) => flat(W * CELL + 8, CELL + 1.1, curbMat, 0, wz(z), 0.05));
+    ROAD_COLS.forEach((x) => flat(CELL, H * CELL + 8, roadMat, wx(x), 0, 0.12));
+    ROAD_ROWS.forEach((z) => flat(W * CELL + 8, CELL, roadMat, 0, wz(z), 0.12));
+
+    // centre dashes, skipping intersections and crosswalks
+    ROAD_COLS.forEach((x) => {
+      for (let z = 0; z < H; z++) {
+        if (ROAD_ROWS.indexOf(z) >= 0 || CROSS_SET.has(crossKey(x, z))) continue;
+        flat(0.22, CELL * 0.5, paintMat, wx(x), wz(z), 0.21);
+      }
+    });
+    ROAD_ROWS.forEach((z) => {
+      for (let x = 0; x < W; x++) {
+        if (ROAD_COLS.indexOf(x) >= 0 || CROSS_SET.has(crossKey(x, z))) continue;
+        flat(CELL * 0.5, 0.22, paintMat, wx(x), wz(z), 0.21);
+      }
+    });
+
+    // roundabout marking
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.05, 1.5, 40),
+      new THREE.MeshBasicMaterial({ color: 0xF3F6F2, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(wx(ROUNDABOUT[0]), 0.22, wz(ROUNDABOUT[1]));
+    scene.add(ring);
+
+    /* ---- street-name plaques, styled like the town's road signs */
+    function streetPlaque(text, x, z) {
+      const t = textTexture(text, {
+        size: 46, color: "#FFFFFF", bg: "#0E5C3A", border: "#FFFFFF", tracking: "3px", radius: 10
+      });
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.texture, depthTest: true }));
+      const sc = 0.0125;
+      spr.scale.set(t.w * sc, t.h * sc, 1);
+      spr.position.set(x, 3.1, z);
+      scene.add(spr);
+    }
+    STREETS_H.forEach((st) => streetPlaque(st.name, wx(9), wz(st.z)));
+    STREETS_V.forEach((st) => streetPlaque(st.name, wx(st.x), wz(8.5)));
+
+    /* ---- crosswalks + traffic lights */
+    const lights = [];
+    CROSSWALKS.forEach((c, i) => {
+      const x = c[0], z = c[1];
+      const vertical = ROAD_COLS.indexOf(x) >= 0; // travel runs along z
+      for (let s = -2; s <= 2; s++) {
+        const off = s * 0.72;
+        if (vertical) flat(CELL * 0.86, 0.38, paintMat, wx(x), wz(z) + off, 0.22);
+        else flat(0.38, CELL * 0.86, paintMat, wx(x) + off, wz(z), 0.22);
+      }
+      // pole on the near corner
+      const g = new THREE.Group();
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.13, 3.4, 8),
+        new THREE.MeshLambertMaterial({ color: 0x2E3A34 })
+      );
+      pole.position.y = 1.7; pole.castShadow = true; g.add(pole);
+      const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.62, 1.15, 0.42),
+        new THREE.MeshLambertMaterial({ color: 0x22302A })
+      );
+      head.position.y = 3.55; head.castShadow = true; g.add(head);
+      const bulb = (color, y) => {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16, 12, 12),
+          new THREE.MeshBasicMaterial({ color: color })
+        );
+        m.position.set(0, y, 0.24);
+        g.add(m);
+        return m;
+      };
+      const red = bulb(0x5A1F1F, 3.85);
+      const green = bulb(0x1F4A2C, 3.28);
+      const px = wx(x) + (vertical ? CELL * 0.72 : 0);
+      const pz = wz(z) + (vertical ? 0 : CELL * 0.72);
+      g.position.set(px, 0, pz);
+      scene.add(g);
+      lights.push({ cell: c, red: red, green: green, offset: (i * 1.9) % 9, isGreen: true });
+    });
+
+    /* ---- buildings */
+    const labels = [];
+    PLACES.forEach((p) => {
+      const cx = (wx(p.x0) + wx(p.x1)) / 2;
+      const cz = (wz(p.z0) + wz(p.z1)) / 2;
+      const bw = (p.x1 - p.x0 + 1) * CELL - 1.6;
+      const bd = (p.z1 - p.z0 + 1) * CELL - 1.6;
+
+      if (p.park) {
+        const pad = new THREE.Mesh(
+          new THREE.BoxGeometry(bw, 0.3, bd),
+          new THREE.MeshLambertMaterial({ color: 0x6FAE7C })
+        );
+        pad.position.set(cx, 0.15, cz);
+        pad.receiveShadow = true;
+        scene.add(pad);
+        const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6B4A2F });
+        const leafMat = new THREE.MeshLambertMaterial({ color: 0x2F7D4F });
+        const spots = [[-4, -3.4], [1.6, -4.4], [4.4, -1], [-3, 2.2], [2.4, 3.6], [-0.4, 0.2]];
+        spots.forEach((s, i) => {
+          const t = new THREE.Group();
+          const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 1.3, 7), trunkMat);
+          tr.position.y = 0.8; tr.castShadow = true; t.add(tr);
+          const r = 1.05 + (i % 3) * 0.16;
+          const lf = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), leafMat);
+          lf.position.y = 2.1; lf.castShadow = true; t.add(lf);
+          t.position.set(cx + s[0], 0.25, cz + s[1]);
+          scene.add(t);
+        });
+      } else {
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(bw, p.h, bd),
+          new THREE.MeshLambertMaterial({ color: p.color })
+        );
+        body.position.set(cx, p.h / 2, cz);
+        body.castShadow = true; body.receiveShadow = true;
+        scene.add(body);
+
+        const roofColor = new THREE.Color(p.color).multiplyScalar(0.66);
+        const roof = new THREE.Mesh(
+          new THREE.BoxGeometry(bw - 0.9, 0.42, bd - 0.9),
+          new THREE.MeshLambertMaterial({ color: roofColor })
+        );
+        roof.position.set(cx, p.h + 0.2, cz);
+        roof.castShadow = true;
+        scene.add(roof);
+
+        // windows: a band of dark panels on each long face
+        const winMat = new THREE.MeshLambertMaterial({ color: 0x33474F });
+        const rows = Math.max(1, Math.floor(p.h / 2.2));
+        for (let r = 0; r < rows; r++) {
+          const y = 1.2 + r * 2.0;
+          if (y > p.h - 0.7) break;
+          const b1 = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.78, 0.85, 0.12), winMat);
+          b1.position.set(cx, y, cz - bd / 2 - 0.03); scene.add(b1);
+          const b2 = b1.clone(); b2.position.z = cz + bd / 2 + 0.03; scene.add(b2);
+          const b3 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.85, bd * 0.78), winMat);
+          b3.position.set(cx - bw / 2 - 0.03, y, cz); scene.add(b3);
+          const b4 = b3.clone(); b4.position.x = cx + bw / 2 + 0.03; scene.add(b4);
+        }
+      }
+
+      // doormat on the entrance cell
+      const mat = new THREE.Mesh(
+        new THREE.PlaneGeometry(CELL * 0.66, CELL * 0.66),
+        new THREE.MeshBasicMaterial({ color: 0xE7ECE6, transparent: true, opacity: 0.55 })
+      );
+      mat.rotation.x = -Math.PI / 2;
+      mat.position.set(wx(p.ex), 0.25, wz(p.ez));
+      scene.add(mat);
+      p._mat = mat;
+
+      // floating name label
+      const t = textTexture(p.en.replace(/^the /, "").toUpperCase(), {
+        size: 52, color: "#12271F", bg: "#F4F7F3", border: "#1B4332", tracking: "2px"
+      });
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.texture, depthTest: true }));
+      const s = 0.0125;
+      spr.scale.set(t.w * s, t.h * s, 1);
+      spr.position.set(cx, (p.park ? 4.4 : p.h + 2.0), cz);
+      scene.add(spr);
+      labels.push(spr);
+    });
+
+    /* ---- target pin */
+    const pin = new THREE.Group();
+    const pinCone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.95, 2.1, 18),
+      new THREE.MeshLambertMaterial({ color: 0xE8722C, emissive: 0x5A2408 })
+    );
+    pinCone.rotation.x = Math.PI;
+    pinCone.position.y = 1.05;
+    pin.add(pinCone);
+    const pinBall = new THREE.Mesh(
+      new THREE.SphereGeometry(0.85, 16, 14),
+      new THREE.MeshLambertMaterial({ color: 0xE8722C, emissive: 0x5A2408 })
+    );
+    pinBall.position.y = 2.5;
+    pin.add(pinBall);
+    pin.visible = false;
+    scene.add(pin);
+
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.9, 1.5, 32),
+      new THREE.MeshBasicMaterial({ color: 0xE8722C, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.3;
+    halo.visible = false;
+    scene.add(halo);
+
+    /* ---- the bot (built facing -z) */
+    const bot = new THREE.Group();
+    const shellMat = new THREE.MeshLambertMaterial({ color: 0xE8722C });
+    const trimMat = new THREE.MeshLambertMaterial({ color: 0xF6F8F5 });
+    const darkMat = new THREE.MeshLambertMaterial({ color: 0x223029 });
+
+    const botInner = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.25, 0.9), shellMat);
+    body.position.y = 1.05; body.castShadow = true; botInner.add(body);
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.22, 0.95), trimMat);
+    belt.position.y = 1.0; botInner.add(belt);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.82, 0.85), trimMat);
+    head.position.y = 2.06; head.castShadow = true; botInner.add(head);
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.36, 0.1), darkMat);
+    visor.position.set(0, 2.1, -0.45); botInner.add(visor);
+    [-0.17, 0.17].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.088, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0x8CF0C4 }));
+      eye.position.set(ex, 2.1, -0.5); botInner.add(eye);
+    });
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 6), darkMat);
+    ant.position.y = 2.68; botInner.add(ant);
+    const antBall = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0x8CF0C4 }));
+    antBall.position.y = 2.97; botInner.add(antBall);
+    const legs = [];
+    [-0.32, 0.32].forEach((lx) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.62, 0.34), darkMat);
+      leg.position.set(lx, 0.31, 0); leg.castShadow = true;
+      botInner.add(leg); legs.push(leg);
+    });
+    const arms = [];
+    [-0.72, 0.72].forEach((ax) => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.8, 0.26), shellMat);
+      arm.position.set(ax, 1.15, 0); arm.castShadow = true;
+      botInner.add(arm); arms.push(arm);
+    });
+    bot.add(botInner);
+    scene.add(bot);
+
+    Scene.state = {
+      renderer, scene, camera, host, bot, botInner, legs, arms,
+      pin, pinCone, halo, lights, labels, sun
+    };
+    return Scene.state;
+  };
+
+  /* ================================================================= engine */
+  const S = {
+    cell: [START.x, START.z],
+    heading: START.h,
+    yaw: YAW[START.h],
+    anim: null,
+    mapView: false,
+    target: null,
+    walkT: 0,
+    clock: null,
+    camPos: new THREE.Vector3(),
+    camLook: new THREE.Vector3(),
+    started: false
+  };
+
+  let three = null;
+  let notify = function () {};
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const MOVE_MS = reduceMotion ? 90 : 520;
+  const TURN_MS = reduceMotion ? 70 : 360;
+
+  function lightIsGreen(cell, t) {
+    const l = three.lights.find((L) => L.cell[0] === cell[0] && L.cell[1] === cell[1]);
+    if (!l) return true;
+    return ((t + l.offset) % 9) < 6;
+  }
+
+  function placeBot() {
+    three.bot.position.set(wx(S.cell[0]), 0, wz(S.cell[1]));
+    three.bot.rotation.y = S.yaw;
+  }
+
+  function setTarget(place) {
+    S.target = place;
+    const cx = (wx(place.x0) + wx(place.x1)) / 2;
+    const cz = (wz(place.z0) + wz(place.z1)) / 2;
+    three.pin.position.set(cx, place.park ? 5.0 : place.h + 3.4, cz);
+    three.pin.visible = true;
+    three.halo.position.set(wx(place.ex), 0.3, wz(place.ez));
+    three.halo.visible = true;
+  }
+
+  function frontCell() {
+    const d = DIR[S.heading];
+    return [S.cell[0] + d[0], S.cell[1] + d[1]];
+  }
+
+  /* ---------------------------------------------------------- render loop */
+  function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(S.clock.getDelta(), 0.05);
+    const t = S.clock.getElapsedTime();
+
+    // traffic lights
+    three.lights.forEach((L) => {
+      const green = ((t + L.offset) % 9) < 6;
+      if (green !== L.isGreen) {
+        L.isGreen = green;
+        L.green.material.color.setHex(green ? 0x3FD07A : 0x1F4A2C);
+        L.red.material.color.setHex(green ? 0x5A1F1F : 0xF0533F);
+      }
+    });
+
+    // target pin bob
+    if (three.pin.visible) {
+      three.pin.rotation.y = t * 1.1;
+      three.pin.children.forEach((c, i) => { c.position.y = (i === 0 ? 1.05 : 2.5) + Math.sin(t * 2.4) * 0.22; });
+      const p = 0.55 + Math.sin(t * 3.2) * 0.3;
+      three.halo.material.opacity = p;
+      three.halo.scale.setScalar(1 + Math.sin(t * 3.2) * 0.09);
+    }
+
+    // command animation
+    const a = S.anim;
+    if (a) {
+      const k = Math.min(1, (performance.now() - a.start) / a.dur);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      if (a.kind === "move") {
+        three.bot.position.x = a.fromX + (a.toX - a.fromX) * e;
+        three.bot.position.z = a.fromZ + (a.toZ - a.fromZ) * e;
+        S.walkT += dt * 11;
+      } else if (a.kind === "turn") {
+        three.bot.rotation.y = a.fromYaw + (a.toYaw - a.fromYaw) * e;
+        S.walkT += dt * 5;
+      } else {
+        S.walkT *= 0.9; // waiting at the lights
+      }
+      if (k >= 1) {
+        S.anim = null;
+        placeBot();
+        notify();
+      }
+    } else {
+      S.walkT *= 0.86;
+    }
+
+    // walk cycle
+    const swing = Math.sin(S.walkT) * 0.5;
+    three.legs[0].rotation.x = swing;
+    three.legs[1].rotation.x = -swing;
+    three.arms[0].rotation.x = -swing * 0.8;
+    three.arms[1].rotation.x = swing * 0.8;
+    three.botInner.position.y = Math.abs(Math.sin(S.walkT)) * 0.09;
+
+    // camera
+    three.scene.fog.near = S.mapView ? 400 : 85;
+    three.scene.fog.far = S.mapView ? 900 : 210;
+    const bp = three.bot.position;
+    let want, look;
+    if (S.mapView) {
+      want = new THREE.Vector3(0, 74, 24);
+      look = new THREE.Vector3(0, 0, 0);
+    } else {
+      const yaw = three.bot.rotation.y;
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      want = new THREE.Vector3(bp.x - fx * 15, 13.2, bp.z - fz * 15);
+      look = new THREE.Vector3(bp.x + fx * 7, 0.6, bp.z + fz * 7);
+    }
+    const lerp = 1 - Math.pow(0.0016, dt);
+    S.camPos.lerp(want, lerp);
+    S.camLook.lerp(look, lerp);
+    three.camera.position.copy(S.camPos);
+    three.camera.lookAt(S.camLook);
+
+    three.renderer.render(three.scene, three.camera);
+  }
+
+  /* =============================================================== storage */
+  /* Talks to the scores API when the server is reachable; falls back to this
+     browser's localStorage so the game still works offline. */
+  const API = (typeof window.ROBO_API === "string" && window.ROBO_API) || "/api/scores";
+  const LOCAL_KEY = "robo-games";
+  const POLL_MS = 5000;
+
+  function localList() {
+    try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); }
+    catch (err) { return []; }
+  }
+  function localSave(rec) {
+    try {
+      const all = localList();
+      all.unshift(rec);
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(all.slice(0, 300)));
+    } catch (err) { /* private mode: the game still works */ }
+  }
+
+  const Store = {
+    mode: "offline",
+    async init() {
+      try {
+        const r = await fetch(API + "?limit=1", { headers: { Accept: "application/json" } });
+        if (r.ok) Store.mode = "server";
+      } catch (err) { /* stays offline */ }
+      return Store.mode;
+    },
+    async list() {
+      if (Store.mode === "server") {
+        try {
+          const r = await fetch(API + "?limit=200", { headers: { Accept: "application/json" } });
+          if (r.ok) {
+            const body = await r.json();
+            if (body && Array.isArray(body.items)) return body.items;
+          }
+        } catch (err) { /* fall through to local */ }
+      }
+      return localList();
+    },
+    async save(rec) {
+      if (Store.mode === "server") {
+        try {
+          const r = await fetch(API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(rec)
+          });
+          if (r.ok) return;
+        } catch (err) { /* fall through to local */ }
+      }
+      localSave(rec);
+    },
+    watch(cb) {
+      if (Store.mode !== "server") return function () {};
+      const id = setInterval(function () {
+        Store.list().then(cb).catch(function () {});
+      }, POLL_MS);
+      return function () { clearInterval(id); };
+    }
+  };
+
+  function summarise(games) {
+    const byName = {};
+    games.forEach(function (g) {
+      const key = String(g.name || "").trim().toLowerCase();
+      if (!key) return;
+      const p = byName[key] || (byName[key] = {
+        name: g.name, games: 0, best: 0, mistakes: 0, correct: 0, answers: 0
+      });
+      p.games += 1;
+      p.mistakes += g.mistakes || 0;
+      p.correct += g.correct || 0;
+      p.answers += g.answers || 0;
+      const acc = g.answers ? Math.round((g.correct / g.answers) * 100) : 0;
+      if (acc > p.best) p.best = acc;
+    });
+    const players = Object.keys(byName).map(function (k) { return byName[k]; });
+    players.sort(function (a, b) { return (b.best - a.best) || (a.mistakes - b.mistakes); });
+    return { players: players, totalPlayers: players.length, totalGames: games.length };
+  }
+
+  /* ======================================================= question engine */
+  /* const ACTIONS = {
+    straight: { glyph: "↑", en: "Go straight ahead.",        es: "Sigue derecho." },
+    left:     { glyph: "↰", en: "Turn left.",                es: "Gira a la izquierda." },
+    right:    { glyph: "↱", en: "Turn right.",               es: "Gira a la derecha." },
+    cross:    { glyph: "☰", en: "Cross the street.",         es: "Cruza la calle." },
+    wait:     { glyph: "◷", en: "Wait for the green light.", es: "Espera la luz verde." },
+    stop:     { glyph: "■", en: "Stop here.",                es: "Detente aquí." }
+  }; */
+  const ACTIONS = {
+    straight: { glyph: "↑", en: "Go straight ahead.",        },
+    left:     { glyph: "↰", en: "Turn left.",                },
+    right:    { glyph: "↱", en: "Turn right.",               },
+    cross:    { glyph: "☰", en: "Cross the street.",         },
+    wait:     { glyph: "◷", en: "Wait for the green light.", },
+    stop:     { glyph: "■", en: "Stop here.",                 }
+  };
+
+  function streetAt(cell) {
+    const v = STREETS_V.find(function (s) { return s.x === cell[0]; });
+    const h = STREETS_H.find(function (s) { return s.z === cell[1]; });
+    if (v && h) return { corner: true, a: h.name, b: v.name };
+    if (v) return { corner: false, a: v.name };
+    if (h) return { corner: false, a: h.name };
+    return null;
+  }
+
+  function titleCase(s) {
+    return s.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); })
+            .replace(/\bSt\b/, "Street");
+  }
+
+  // a building whose block touches this road cell
+  function placeBeside(cell) {
+    for (let i = 0; i < PLACES.length; i++) {
+      const p = PLACES[i];
+      const nearX = cell[0] >= p.x0 - 1 && cell[0] <= p.x1 + 1;
+      const nearZ = cell[1] >= p.z0 - 1 && cell[1] <= p.z1 + 1;
+      if (nearX && nearZ) return p;
+    }
+    return null;
+  }
+
+  function aEs(sp) { return sp.indexOf("el ") === 0 ? "al " + sp.slice(3) : "a " + sp; }
+  function deEs(sp) { return sp.indexOf("el ") === 0 ? "del " + sp.slice(3) : "de " + sp; }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function buildQuestion(t) {
+    const goal = [S.target.ex, S.target.ez];
+    const arrived = S.cell[0] === goal[0] && S.cell[1] === goal[1];
+
+    let correct, step = null, ahead = null, aheadIsCross = false, green = true;
+
+    if (arrived) {
+      correct = ["stop"];
+    } else {
+      step = bfsNext(S.cell, goal);
+      if (!step) return null;
+      let want = S.heading;
+      for (let d = 0; d < 4; d++) {
+        if (DIR[d][0] === step[0] - S.cell[0] && DIR[d][1] === step[1] - S.cell[1]) want = d;
+      }
+      if (want === S.heading) {
+        ahead = step;
+        aheadIsCross = CROSS_SET.has(crossKey(step[0], step[1]));
+        green = aheadIsCross ? lightIsGreen(step, t) : true;
+        correct = aheadIsCross ? (green ? ["cross"] : ["wait"]) : ["straight"];
+      } else if (want === (S.heading + 1) % 4) {
+        correct = ["right"];
+      } else if (want === (S.heading + 3) % 4) {
+        correct = ["left"];
+      } else {
+        correct = ["left", "right"]; // Robo has to turn around
+      }
+    }
+
+    // what Robo can see from here, for the wording of the question
+    const st = streetAt(S.cell);
+    const onRoundabout = S.cell[0] === ROUNDABOUT[0] && S.cell[1] === ROUNDABOUT[1];
+    const nextIsCross = !arrived && ahead && aheadIsCross;
+    const near = placeBeside(S.cell);
+
+    let en, es;
+    if (arrived) {
+      en = "We're at " + S.target.en + "! What do I do now?";
+      es = "¡Llegamos " + aEs(S.target.es) + "! ¿Qué hago ahora?";
+    } else if (nextIsCross && !green) {
+      en = "There's a crosswalk here and the light is red. What do I do?";
+      es = "Hay un paso de cebra y el semáforo está en rojo. ¿Qué hago?";
+    } else if (nextIsCross) {
+      en = "There's a crosswalk in front of me. What do I do?";
+      es = "Tengo un paso de cebra delante. ¿Qué hago?";
+    } else if (onRoundabout) {
+      en = "I'm at the roundabout. Which way do I go?";
+      es = "Estoy en la glorieta. ¿Por dónde voy?";
+    } else if (st && st.corner) {
+      en = "I'm on the corner of " + titleCase(st.a) + " and " + titleCase(st.b) + ". Which way?";
+      es = "Estoy en la esquina. ¿Por dónde?";
+    } else if (near) {
+      en = "I can see " + near.en + " from here. What do I do?";
+      es = "Desde aquí veo " + near.es + ". ¿Qué hago?";
+    } else if (st) {
+      en = "I'm walking along " + titleCase(st.a) + ". What now?";
+      es = "Voy por " + titleCase(st.a) + ". ¿Y ahora?";
+    } else {
+      en = "What do I do now?";
+      es = "¿Qué hago ahora?";
+    }
+
+    const extra = Math.random() < 0.5 ? "cross" : "stop";
+    const pools = {
+      stop: ["straight", "left", "right"],
+      cross: ["straight", "left", "wait"],
+      wait: ["cross", "straight", "right"],
+      straight: ["left", "right", extra],
+      left: ["right", "straight", extra],
+      right: ["left", "straight", extra]
+    };
+    let opts = [correct[0]].concat(correct.slice(1)).concat(pools[correct[0]]);
+    opts = opts.filter(function (v, i, a) { return a.indexOf(v) === i; }).slice(0, 4);
+
+    return { en: en, es: es, options: shuffle(opts), correct: correct, step: step };
+  }
+
+  function whyWrong(pick, q) {
+    if (pick === "stop") {
+      return ["Not yet — this isn't " + S.target.en + ".",
+              "(Todavía no: aquí no es " + S.target.es + ".)"];
+    }
+    if (pick === "wait") {
+      return ["There's no red light stopping us here.",
+              "(Aquí no hay ningún semáforo en rojo.)"];
+    }
+    if (pick === "cross") {
+      const f = frontCell();
+      if (!CROSS_SET.has(crossKey(f[0], f[1]))) {
+        return ["There's no crosswalk in front of me.",
+                "(No tengo ningún paso de cebra delante.)"];
+      }
+      return ["The light is red — I can't cross yet.",
+              "(El semáforo está en rojo: todavía no puedo cruzar.)"];
+    }
+    if (pick === "straight") {
+      const f = frontCell();
+      if (!isRoad(f[0], f[1])) {
+        return ["I'd walk into a building!", "(¡Me estrellaría contra un edificio!)"];
+      }
+      if (CROSS_SET.has(crossKey(f[0], f[1]))) {
+        return ["There's a crosswalk — I have to cross, not just walk on.",
+                "(Hay un paso de cebra: hay que cruzar, no seguir derecho.)"];
+      }
+      return ["That takes us away from " + S.target.en + ".",
+              "(Eso nos aleja " + deEs(S.target.es) + ".)"];
+    }
+    return ["That's the wrong way for " + S.target.en + ".",
+            "(Por ahí no llegamos " + aEs(S.target.es) + ".)"];
+  }
+
+  /* =================================================================== React */
+  const e = React.createElement;
+  const WAIT_MS = reduceMotion ? 200 : 1300;
+
+  function App() {
+    const [phase, setPhase] = React.useState("start");
+    const [name, setName] = React.useState("");
+    const [round, setRound] = React.useState(0);
+    const [q, setQ] = React.useState(null);
+    const [answers, setAnswers] = React.useState(0);
+    const [correctCount, setCorrectCount] = React.useState(0);
+    const [mistakes, setMistakes] = React.useState(0);
+    const [msg, setMsg] = React.useState(null);
+    const [mapView, setMapView] = React.useState(false);
+    const [log, setLog] = React.useState([]);
+    const [games, setGames] = React.useState([]);
+    const [mode, setMode] = React.useState("local");
+    const [, force] = React.useReducer(function (n) { return n + 1; }, 0);
+
+    const totals = React.useRef({ answers: 0, correct: 0, mistakes: 0, started: 0 });
+    const msgTimer = React.useRef(null);
+    const stepTimer = React.useRef(null);
+    const routeRef = React.useRef([]);
+
+    React.useEffect(function () { notify = force; }, []);
+
+    // storage: start local, upgrade to the shared board if this view has one
+    React.useEffect(function () {
+      let stop = function () {};
+      let alive = true;
+      Store.init().then(function (m) {
+        if (!alive) return;
+        setMode(m);
+        Store.list().then(function (g) { if (alive) setGames(g); });
+        stop = Store.watch(function (g) { if (alive) setGames(g); });
+      });
+      Store.list().then(function (g) { if (alive) setGames(g); });
+      return function () { alive = false; stop(); clearTimeout(stepTimer.current); };
+    }, []);
+
+    const say = React.useCallback(function (en, es, bad) {
+      clearTimeout(msgTimer.current);
+      setMsg({ en: en, es: es, bad: !!bad });
+      msgTimer.current = setTimeout(function () { setMsg(null); }, 3400);
+    }, []);
+
+    const ask = React.useCallback(function () {
+      setQ(buildQuestion(S.clock.getElapsedTime()));
+    }, []);
+
+    const startRound = React.useCallback(function (i) {
+      const place = routeRef.current[i];
+      setTarget(place);
+      setRound(i);
+      setPhase("playing");
+      setQ(buildQuestion(S.clock.getElapsedTime()));
+      say("Robo wants to go to " + place.en + ".", "(Robo quiere ir " + aEs(place.es) + ".)");
+    }, [say]);
+
+    function begin(ev) {
+      ev.preventDefault();
+      if (!name.trim()) return;
+      const pool = PLACES.slice().sort(function () { return Math.random() - 0.5; });
+      routeRef.current = pool.slice(0, 3);
+      totals.current = { answers: 0, correct: 0, mistakes: 0, started: Date.now() };
+      setLog([]); setAnswers(0); setCorrectCount(0); setMistakes(0);
+      S.cell = [START.x, START.z];
+      S.heading = START.h;
+      S.yaw = YAW[START.h];
+      placeBot();
+      startRound(0);
+    }
+
+    function answer(pick) {
+      if (!q || S.anim || phase !== "playing") return;
+      setAnswers(function (n) { return n + 1; });
+      totals.current.answers += 1;
+
+      if (q.correct.indexOf(pick) < 0) {
+        setMistakes(function (m) { return m + 1; });
+        totals.current.mistakes += 1;
+        const w = whyWrong(pick, q);
+        say(w[0], w[1], true);
+        return; // Robo stays put and asks the same question again
+      }
+
+      setCorrectCount(function (n) { return n + 1; });
+      totals.current.correct += 1;
+      setMsg(null);
+
+      if (pick === "stop") {
+        const p = S.target;
+        const entry = {
+          place: p,
+          answers: totals.current.answers,
+          mistakes: totals.current.mistakes
+        };
+        setLog(function (L) { return L.concat([entry]); });
+        three.pin.visible = false;
+        three.halo.visible = false;
+        setQ(null);
+        setPhase("won");
+        return;
+      }
+
+      let dur = TURN_MS;
+      if (pick === "left" || pick === "right") {
+        S.heading = (S.heading + (pick === "left" ? 3 : 1)) % 4;
+        const to = S.yaw + (pick === "left" ? Math.PI / 2 : -Math.PI / 2);
+        S.anim = { kind: "turn", start: performance.now(), dur: TURN_MS, fromYaw: S.yaw, toYaw: to };
+        S.yaw = to;
+      } else if (pick === "wait") {
+        dur = WAIT_MS;
+        S.anim = { kind: "wait", start: performance.now(), dur: WAIT_MS };
+        say("Waiting for the green light…", "(Esperando la luz verde…)");
+      } else {
+        const next = frontCell();
+        dur = MOVE_MS;
+        S.anim = {
+          kind: "move", start: performance.now(), dur: MOVE_MS,
+          fromX: wx(S.cell[0]), fromZ: wz(S.cell[1]),
+          toX: wx(next[0]), toZ: wz(next[1])
+        };
+        S.cell = next;
+      }
+
+      setQ(null);
+      clearTimeout(stepTimer.current);
+      stepTimer.current = setTimeout(ask, dur + 80);
+    }
+
+    function nextRound() {
+      if (round + 1 < routeRef.current.length) { startRound(round + 1); return; }
+      const t = totals.current;
+      const rec = {
+        name: name.trim(),
+        ts: Date.now(),
+        answers: t.answers,
+        correct: t.correct,
+        mistakes: t.mistakes,
+        seconds: Math.round((Date.now() - t.started) / 1000),
+        stops: routeRef.current.map(function (p) { return p.en; })
+      };
+      Store.save(rec).then(function () {
+        Store.list().then(function (g) { setGames(g); });
+      });
+      setGames(function (g) { return [rec].concat(g); });
+      setPhase("done");
+    }
+
+    function toggleMap() { S.mapView = !S.mapView; setMapView(S.mapView); }
+
+    const stats = summarise(games);
+    const accuracy = answers ? Math.round((correctCount / answers) * 100) : 100;
+
+    function statStrip() {
+      return e("div", { className: "statstrip" },
+        e("span", null, e("b", null, stats.totalPlayers), " ",
+          stats.totalPlayers === 1 ? "player" : "players"),
+        e("span", { className: "dot" }, "·"),
+        e("span", null, e("b", null, stats.totalGames), " ",
+          stats.totalGames === 1 ? "game" : "games"),
+        e("span", { className: "dot" }, "·"),
+        e("span", { className: "modetag" },
+          mode === "server" ? "shared scoreboard" : "offline — this device only")
+      );
+    }
+
+    /* -------------------------------------------------------------- views */
+    if (phase === "board") {
+      return e("div", { className: "veil" },
+        e("div", { className: "panel wide" },
+          e("p", { className: "eyebrow" }, "Scoreboard"),
+          e("h1", null, "Who has guided Robo"),
+          e("p", { className: "es" }, "(Quiénes han guiado a Robo)"),
+          statStrip(),
+          stats.players.length === 0
+            ? e("p", { className: "brief", style: { marginTop: 18 } },
+                "No games yet. Be the first to take Robo across town.")
+            : e("div", { className: "boardwrap" },
+                e("table", { className: "board" },
+                  e("thead", null, e("tr", null,
+                    e("th", null, "#"),
+                    e("th", null, "Player"),
+                    e("th", { className: "num" }, "Games"),
+                    e("th", { className: "num" }, "Best"),
+                    e("th", { className: "num" }, "Mistakes")
+                  )),
+                  e("tbody", null, stats.players.slice(0, 25).map(function (p, i) {
+                    return e("tr", { key: p.name + i },
+                      e("td", { className: "rank" }, i + 1),
+                      e("td", null, p.name),
+                      e("td", { className: "num" }, p.games),
+                      e("td", { className: "num acc" }, p.best + "%"),
+                      e("td", { className: "num" }, p.mistakes));
+                  }))
+                )
+              ),
+          e("button", {
+            className: "primary",
+            onClick: function () { setPhase("start"); }
+          }, "Back")
+        )
+      );
+    }
+
+    if (phase === "start") {
+      return e("div", { className: "veil" },
+        e("form", { className: "panel", onSubmit: begin },
+          e("p", { className: "eyebrow" }, "English A1–A2 · Directions"),
+          e("h1", null, "Robo Needs Directions"),
+          e("p", { className: "es" }, "Robo necesita que le des indicaciones."),
+          e("p", { className: "brief" },
+            "Robo walks around town, but at every corner and every crosswalk he ",
+            e("b", null, "stops and asks you what to do"),
+            ". Answer in English and he moves — then he asks again, until he reaches the place he's looking for."),
+          statStrip(),
+          e("label", { className: "fieldlabel", htmlFor: "pname" }, "What's your name?"),
+          e("input", {
+            id: "pname", type: "text", value: name, maxLength: 24, autoComplete: "off",
+            placeholder: "Type your name",
+            onChange: function (ev) { setName(ev.target.value); }
+          }),
+          e("button", { className: "primary", type: "submit", disabled: !name.trim() },
+            "Start walking"),
+          e("button", {
+            className: "ghost", type: "button",
+            onClick: function () { setPhase("board"); }
+          }, "See the scoreboard")
+        )
+      );
+    }
+
+    if (phase === "done") {
+      const t = totals.current;
+      const acc = t.answers ? Math.round((t.correct / t.answers) * 100) : 0;
+      const stars = t.mistakes <= 2 ? "★★★" : (t.mistakes <= 6 ? "★★☆" : "★☆☆");
+      return e("div", { className: "veil" },
+        e("div", { className: "panel" },
+          e("p", { className: "eyebrow" }, "Route complete"),
+          e("h1", null, "Well done, " + name + "!"),
+          e("div", { className: "stars" }, stars),
+          e("div", { className: "statrow" },
+            e("div", { className: "stat" },
+              e("div", { className: "n" }, acc + "%"),
+              e("div", { className: "k" }, "Correct")),
+            e("div", { className: "stat" },
+              e("div", { className: "n" }, t.answers),
+              e("div", { className: "k" }, "Answers")),
+            e("div", { className: "stat" },
+              e("div", { className: "n" }, t.mistakes),
+              e("div", { className: "k" }, "Mistakes"))
+          ),
+          e("ul", { className: "recap" }, log.map(function (r, i) {
+            return e("li", { key: i },
+              e("b", null, r.place.en),
+              e("span", null, r.answers + " answers"));
+          })),
+          e("button", {
+            className: "primary",
+            onClick: function () { S.mapView = false; setMapView(false); setPhase("start"); }
+          }, "Play again"),
+          e("button", {
+            className: "ghost", type: "button",
+            onClick: function () { setPhase("board"); }
+          }, "See the scoreboard")
+        )
+      );
+    }
+
+    if (phase === "won") {
+      const last = log[log.length - 1];
+      const isLast = round + 1 >= routeRef.current.length;
+      return e("div", { className: "veil" },
+        e("div", { className: "panel" },
+          e("p", { className: "eyebrow" },
+            "Destination " + (round + 1) + " of " + routeRef.current.length),
+          e("h1", null, "You made it!"),
+          e("p", { className: "es" },
+            "Robo is at " + S.target.en + ". (Robo llegó " + aEs(S.target.es) + ".)"),
+          e("div", { className: "statrow" },
+            e("div", { className: "stat" },
+              e("div", { className: "n" }, last ? last.answers : answers),
+              e("div", { className: "k" }, "Answers")),
+            e("div", { className: "stat" },
+              e("div", { className: "n" }, mistakes),
+              e("div", { className: "k" }, "Mistakes"))
+          ),
+          e("button", { className: "primary", onClick: nextRound },
+            isLast ? "See your result" : "Next destination")
+        )
+      );
+    }
+
+    /* ------------------------------------------------------- playing HUD */
+    const target = S.target;
+    return e(React.Fragment, null,
+      e("div", { className: "signwrap" },
+        e("div", { className: "sign", key: target.id },
+          e("div", { className: "arrow" }, "➜"),
+          e("div", { className: "txt" },
+            e("div", { className: "lead" }, "Robo is looking for"),
+            e("div", { className: "dest" }, target.en.toUpperCase()),
+            e("div", { className: "destes" }, "(" + target.es + ")")
+          )
+        ),
+        e("div", { className: "counters" },
+          e("div", { className: "chip" }, "Stop ",
+            e("b", null, (round + 1) + "/" + routeRef.current.length)),
+          e("div", { className: "chip" }, "Correct ", e("b", null, accuracy + "%")),
+          e("div", { className: "chip" + (mistakes ? " warn" : "") }, "Mistakes ",
+            e("b", null, mistakes))
+        )
+      ),
+
+      msg && e("div", { className: "toast" + (msg.bad ? " bad" : "") },
+        e("div", { className: "t1" }, msg.en),
+        e("div", { className: "t2" }, msg.es)
+      ),
+
+      e("div", { className: "utility" },
+        e("button", { className: "ubtn" + (mapView ? " on" : ""), onClick: toggleMap },
+          mapView ? "Follow Robo" : "Map view")
+      ),
+
+      e("div", { className: "qcard" + (q ? "" : " thinking") },
+        e("div", { className: "qhead" },
+          e("span", { className: "bubble" }, "ROBO ASKS"),
+          e("span", { className: "qnum" }, "Question " + (answers + 1))
+        ),
+        q
+          ? e(React.Fragment, null,
+              e("p", { className: "qtext" }, q.en),
+              e("p", { className: "qes" }, q.es),
+              e("div", { className: "opts" }, q.options.map(function (id) {
+                const a = ACTIONS[id];
+                return e("button", {
+                  key: id, className: "opt", onClick: function () { answer(id); }
+                },
+                  e("span", { className: "og" }, a.glyph),
+                  e("span", { className: "oen" }, a.en),
+                  e("span", { className: "oes" }, a.es));
+              }))
+            )
+          : e("p", { className: "qtext walking" }, "Walking…")
+      )
+    );
+  }
+
+  /* ================================================================== boot */
+  function fail(what) {
+    const root = document.getElementById("root");
+    root.innerHTML = "";
+    const box = document.createElement("div");
+    box.className = "veil";
+    box.innerHTML =
+      '<div class="panel">' +
+      '<p class="eyebrow">Something went wrong</p>' +
+      '<h1>The town did not load</h1>' +
+      '<p class="brief">' + what + ' Check your internet connection and reload the page.</p>' +
+      '</div>';
+    root.appendChild(box);
+  }
+
+  function boot() {
+    if (typeof THREE === "undefined") { fail("The 3D library could not be downloaded."); return; }
+    if (typeof React === "undefined" || typeof ReactDOM === "undefined") {
+      fail("The interface library could not be downloaded."); return;
+    }
+    const host = document.getElementById("stage");
+    three = Scene.init(host);
+    S.clock = new THREE.Clock();
+    placeBot();
+    S.camPos.set(wx(1), 30, wz(1) + 30);
+    S.camLook.set(0, 0, 0);
+
+    window.addEventListener("resize", function () {
+      three.camera.aspect = host.clientWidth / host.clientHeight;
+      three.camera.updateProjectionMatrix();
+      three.renderer.setSize(host.clientWidth, host.clientHeight);
+    });
+
+    loop();
+    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+  }
+
+  function safeBoot() {
+    try { boot(); }
+    catch (err) {
+      fail("Error: " + (err && err.message ? err.message : String(err)) + ".");
+      throw err;
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", safeBoot);
+  else safeBoot();
+})();
+</script>
+</body>
+</html>
