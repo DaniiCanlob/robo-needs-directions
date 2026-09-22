@@ -768,7 +768,12 @@
     clock: null,
     camPos: new THREE.Vector3(),
     camLook: new THREE.Vector3(),
-    started: false
+    started: false,
+    // true while a question is on screen awaiting an answer: freezes the
+    // traffic-light animation so it can't drift from the answer we already
+    // computed for it.
+    lightFrozen: false,
+    lightFrozenT: 0
   };
 
   let three = null;
@@ -810,9 +815,13 @@
     const dt = Math.min(S.clock.getDelta(), 0.05);
     const t = S.clock.getElapsedTime();
 
-    // traffic lights
+    // traffic lights — frozen at the moment the current question was built,
+    // so what the player sees always matches what the game evaluates as
+    // correct. They only tick live while Robo is moving/turning/waiting
+    // between questions, when there's nothing to answer yet.
+    const lightT = S.lightFrozen ? S.lightFrozenT : t;
     three.lights.forEach((L) => {
-      const green = ((t + L.offset) % 9) < 6;
+      const green = ((lightT + L.offset) % 9) < 6;
       if (green !== L.isGreen) {
         L.isGreen = green;
         L.green.material.color.setHex(green ? 0x3FD07A : 0x1F4A2C);
@@ -1179,7 +1188,10 @@
     }, []);
 
     const ask = React.useCallback(function () {
-      setQ(buildQuestion(S.clock.getElapsedTime()));
+      const t = S.clock.getElapsedTime();
+      S.lightFrozen = true;
+      S.lightFrozenT = t;
+      setQ(buildQuestion(t));
     }, []);
 
     const startRound = React.useCallback(function (i) {
@@ -1187,7 +1199,10 @@
       setTarget(place);
       setRound(i);
       setPhase("playing");
-      setQ(buildQuestion(S.clock.getElapsedTime()));
+      const t = S.clock.getElapsedTime();
+      S.lightFrozen = true;
+      S.lightFrozenT = t;
+      setQ(buildQuestion(t));
       say("Robo wants to go to " + place.en + ".", "(Robo quiere ir " + aEs(place.es) + ".)");
     }, [say]);
 
@@ -1221,6 +1236,7 @@
       setCorrectCount(function (n) { return n + 1; });
       totals.current.correct += 1;
       setMsg(null);
+      S.lightFrozen = false; // Robo is about to act — lights can tick live again
 
       if (pick === "stop") {
         const p = S.target;
